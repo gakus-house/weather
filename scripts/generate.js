@@ -2,46 +2,99 @@ import axios from "axios";
 import ical from "ical-generator";
 import fs from "fs";
 
-// 仙台市泉区
-const LAT = 38.312592140840714;
-const LON = 140.840717;
-
-const url =
-  `https://api.open-meteo.com/v1/forecast` +
-  `?latitude=${LAT}` +
-  `&longitude=${LON}` +
-  `&hourly=` +
-  [
-    "temperature_2m",
-    "precipitation_probability",
-    "rain",
-    "snowfall",
-    "weathercode"
-  ].join(",") +
-  `&timezone=Asia/Tokyo` +
-  `&forecast_days=3`;
-
-const response = await axios.get(url);
-
-const data = response.data;
-
-const cal = ical({
-  name: "仙台市泉区 天気",
-  timezone: "Asia/Tokyo",
-  method: "PUBLISH",
-  prodId: {
-    company: "gaku",
-    product: "weather-calendar",
-    language: "JA",
+// 多地域対応
+const locations = [
+  {
+    id: "sendai",
+    name: "仙台駅",
+    lat: 38.2601,
+    lon: 140.8824,
   },
-
-  x: [
-    ["X-WR-CALNAME", "仙台市泉区 天気"],
-    ["X-WR-TIMEZONE", "Asia/Tokyo"],
-    ["REFRESH-INTERVAL;VALUE=DURATION", "PT1H"],
-    ["X-PUBLISHED-TTL", "PT1H"],
-  ],
-});
+  {
+    id: "izumi",
+    name: "泉中央",
+    lat: 38.3237,
+    lon: 140.8816,
+  },
+  {
+    id: "nagamachi",
+    name: "長町",
+    lat: 38.2245,
+    lon: 140.8796,
+  },
+  {
+    id: "chomeigaoka",
+    name: "長命ケ丘",
+    lat: 38.3346,
+    lon: 140.8213,
+  },
+  {
+    id: "yagiyama",
+    name: "八木山",
+    lat: 38.2332,
+    lon: 140.8577,
+  },
+  {
+    id: "akita",
+    name: "秋田",
+    lat: 39.7200,
+    lon: 140.1025,
+  },
+  {
+    id: "akihabara",
+    name: "秋葉原",
+    lat: 35.6984,
+    lon: 139.7730,
+  },
+  {
+    id: "aobadori",
+    name: "青葉通",
+    lat: 38.2597,
+    lon: 140.8694,
+  },
+  {
+    id: "kokubuncho",
+    name: "国分町",
+    lat: 38.2645,
+    lon: 140.8696,
+  },
+  {
+    id: "aramachi",
+    name: "荒町",
+    lat: 38.2462,
+    lon: 140.8804,
+  },
+  {
+    id: "tomiya",
+    name: "富谷",
+    lat: 38.3931,
+    lon: 140.8861,
+  },
+  {
+    id: "tagajo",
+    name: "多賀城",
+    lat: 38.2938,
+    lon: 141.0046,
+  },
+  {
+    id: "shiogama",
+    name: "塩釜",
+    lat: 38.3147,
+    lon: 141.0228,
+  },
+  {
+    id: "iwanuma",
+    name: "岩沼",
+    lat: 38.1047,
+    lon: 140.8595,
+  },
+  {
+    id: "akiu",
+    name: "秋保",
+    lat: 38.2265,
+    lon: 140.7223,
+  },
+];
 
 function emoji(code, rain, snow) {
   if (snow > 0) return "❄️";
@@ -52,98 +105,134 @@ function emoji(code, rain, snow) {
   return "🌤";
 }
 
-const times = data.hourly.time;
+for (const loc of locations) {
+  const url =
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${loc.lat}` +
+    `&longitude=${loc.lon}` +
+    `&hourly=` +
+    [
+      "temperature_2m",
+      "precipitation_probability",
+      "rain",
+      "snowfall",
+      "weathercode"
+    ].join(",") +
+    `&timezone=Asia/Tokyo` +
+    `&forecast_days=7`;
 
-for (let i = 0; i < times.length; i++) {
-  const time = times[i];
+  const response = await axios.get(url);
 
-  const temp =
-    data.hourly.temperature_2m[i];
+  const data = response.data;
 
-  const rain =
-    data.hourly.rain[i];
+  const cal = ical({
+    name: `${loc.name} 天気`,
+    timezone: "Asia/Tokyo",
+    method: "PUBLISH",
 
-  const snow =
-    data.hourly.snowfall[i];
-
-  const probability =
-    data.hourly.precipitation_probability[i];
-
-  const code =
-    data.hourly.weathercode[i];
-
-  const icon =
-    emoji(code, rain, snow);
-
-  const start = new Date(time);
-
-  const end = new Date(start);
-  end.setHours(end.getHours() + 1);
-
-  // 通常イベント
-  cal.createEvent({
-    id: `weather-${time}`,
-
-    start,
-    end,
-
-    summary:
-      `${icon} ${temp}°C ☔${probability}%`,
-
-    description:
-      `仙台市泉区\n` +
-      `気温: ${temp}°C\n` +
-      `降水確率: ${probability}%\n` +
-      `雨量: ${rain}mm\n` +
-      `積雪: ${snow}cm`,
-
-    location: "仙台市泉区",
-
-    busystatus: "FREE",
-    transparency: "TRANSPARENT",
+    x: [
+      ["X-WR-CALNAME", `${loc.name} 天気`],
+      ["X-WR-TIMEZONE", "Asia/Tokyo"],
+      ["REFRESH-INTERVAL;VALUE=DURATION", "PT1H"],
+      ["X-PUBLISHED-TTL", "PT1H"],
+    ],
   });
 
-  // 雨通知
-  if (
-    probability >= 70 ||
-    rain > 0
-  ) {
+  const times = data.hourly.time;
+
+  for (let i = 0; i < times.length; i++) {
+    const time = times[i];
+
+    const temp =
+      data.hourly.temperature_2m[i];
+
+    const rain =
+      data.hourly.rain[i];
+
+    const snow =
+      data.hourly.snowfall[i];
+
+    const probability =
+      data.hourly.precipitation_probability[i];
+
+    const code =
+      data.hourly.weathercode[i];
+
+    const icon =
+      emoji(code, rain, snow);
+
+    const start = new Date(time);
+
+    const end = new Date(start);
+    end.setHours(end.getHours() + 1);
+
+    // 通常イベント
     cal.createEvent({
-      id: `rain-alert-${time}`,
+      id: `${loc.id}-${time}`,
 
       start,
       end,
 
       summary:
-        `☔ 雨予報 ${probability}%`,
+        `${icon} ${temp}°C ☔${probability}%`,
 
       description:
-        `仙台市泉区で雨予報\n` +
-        `雨量: ${rain}mm`,
+        `${loc.name}\n` +
+        `気温: ${temp}°C\n` +
+        `降水確率: ${probability}%\n` +
+        `雨量: ${rain}mm\n` +
+        `積雪: ${snow}cm`,
 
-      location: "仙台市泉区",
-
-      alarms: [
-        {
-          type: "display",
-          trigger: -1800,
-        },
-      ],
+      location: loc.name,
 
       busystatus: "FREE",
       transparency: "TRANSPARENT",
     });
+
+    // 雨通知
+    if (
+      probability >= 70 ||
+      rain > 0
+    ) {
+      cal.createEvent({
+        id: `rain-${loc.id}-${time}`,
+
+        start,
+        end,
+
+        summary:
+          `☔ ${loc.name} 雨予報 ${probability}%`,
+
+        description:
+          `${loc.name}で雨予報\n` +
+          `雨量: ${rain}mm`,
+
+        location: loc.name,
+
+        alarms: [
+          {
+            type: "display",
+            trigger: -1800,
+          },
+        ],
+
+        busystatus: "FREE",
+        transparency: "TRANSPARENT",
+      });
+    }
   }
+
+  // フォルダ作成
+  fs.mkdirSync(loc.id, {
+    recursive: true,
+  });
+
+  // 保存
+  fs.writeFileSync(
+    `${loc.id}/weather.ics`,
+    cal.toString(),
+    "utf8"
+  );
+
+  console.log(`generated ${loc.id}`);
 }
-
-// docs フォルダ作成
-fs.mkdirSync("docs", {
-  recursive: true,
-});
-
-// ICS保存
-fs.writeFileSync(
-  "weather.ics",
-  cal.toString(),
-  "utf8"
-);
