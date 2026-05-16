@@ -10,7 +10,7 @@ const WEATHER_URL =
   `https://api.open-meteo.com/v1/forecast` +
   `?latitude=${LAT}` +
   `&longitude=${LON}` +
-  `&hourly=temperature_2m,precipitation_probability,rain,snowfall,weather_code` +
+  `&hourly=temperature_2m,precipitation_probability,rain,snowfall,weathercode` +
   `&timezone=Asia%2FTokyo` +
   `&forecast_days=3`;
 
@@ -23,7 +23,6 @@ const cal = ical({
   timezone: "Asia/Tokyo",
   method: "PUBLISH",
 
-  // Apple Calendar 最適化
   x: [
     ["X-WR-CALNAME", "仙台市泉区 天気"],
     ["X-WR-TIMEZONE", "Asia/Tokyo"],
@@ -32,7 +31,8 @@ const cal = ical({
   ],
 });
 
-const emoji = (code, rain) => {
+const emoji = (code, rain, snow) => {
+  if (snow > 0) return "❄️";
   if (rain > 5) return "⛈";
   if (rain > 0) return "🌧";
   if (code === 0) return "☀️";
@@ -45,20 +45,29 @@ const times = data.hourly.time;
 for (let i = 0; i < times.length; i++) {
   const time = times[i];
 
-  const temp = data.hourly.temperature_2m[i];
-  const rain = data.hourly.rain[i];
+  const temp =
+    data.hourly.temperature_2m[i];
+
+  const rain =
+    data.hourly.rain[i];
+
+  const snow =
+    data.hourly.snowfall[i];
+
   const probability =
     data.hourly.precipitation_probability[i];
-  const code = data.hourly.weather_code[i];
 
-  const icon = emoji(code, rain);
+  const code =
+    data.hourly.weathercode[i];
+
+  const icon = emoji(code, rain, snow);
 
   const start = new Date(time);
 
   const end = new Date(start);
   end.setHours(end.getHours() + 1);
 
-  // 通常天気イベント
+  // 通常イベント
   cal.createEvent({
     id: `weather-${time}`,
 
@@ -72,7 +81,8 @@ for (let i = 0; i < times.length; i++) {
       `仙台市泉区\n` +
       `気温: ${temp}°C\n` +
       `降水確率: ${probability}%\n` +
-      `雨量: ${rain}mm`,
+      `雨量: ${rain}mm\n` +
+      `積雪: ${snow}cm`,
 
     location: "仙台市泉区",
 
@@ -80,7 +90,7 @@ for (let i = 0; i < times.length; i++) {
     transparency: "TRANSPARENT",
   });
 
-  // 雨通知イベント
+  // 雨通知
   if (probability >= 70 || rain > 0) {
     cal.createEvent({
       id: `rain-alert-${time}`,
@@ -100,8 +110,6 @@ for (let i = 0; i < times.length; i++) {
       alarms: [
         {
           type: "display",
-
-          // 30分前通知
           trigger: -1800,
         },
       ],
@@ -112,11 +120,13 @@ for (let i = 0; i < times.length; i++) {
   }
 }
 
-fs.mkdirSync("docs", { recursive: true });
+fs.mkdirSync("docs", {
+  recursive: true,
+});
 
 fs.writeFileSync(
   "docs/weather.ics",
   cal.toString()
 );
 
-console.log("generated");
+console.log("generated docs/weather.ics");
