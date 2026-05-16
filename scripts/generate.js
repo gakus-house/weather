@@ -6,15 +6,22 @@ import fs from "fs";
 const LAT = 38.312592140840714;
 const LON = 140.840717;
 
-const WEATHER_URL =
+const url =
   `https://api.open-meteo.com/v1/forecast` +
   `?latitude=${LAT}` +
   `&longitude=${LON}` +
-  `&hourly=temperature_2m,precipitation_probability,rain,snowfall,weathercode` +
-  `&timezone=Asia%2FTokyo` +
+  `&hourly=` +
+  [
+    "temperature_2m",
+    "precipitation_probability",
+    "rain",
+    "snowfall",
+    "weathercode"
+  ].join(",") +
+  `&timezone=Asia/Tokyo` +
   `&forecast_days=3`;
 
-const response = await axios.get(WEATHER_URL);
+const response = await axios.get(url);
 
 const data = response.data;
 
@@ -22,6 +29,11 @@ const cal = ical({
   name: "仙台市泉区 天気",
   timezone: "Asia/Tokyo",
   method: "PUBLISH",
+  prodId: {
+    company: "gaku",
+    product: "weather-calendar",
+    language: "JA",
+  },
 
   x: [
     ["X-WR-CALNAME", "仙台市泉区 天気"],
@@ -31,14 +43,14 @@ const cal = ical({
   ],
 });
 
-const emoji = (code, rain, snow) => {
+function emoji(code, rain, snow) {
   if (snow > 0) return "❄️";
   if (rain > 5) return "⛈";
   if (rain > 0) return "🌧";
   if (code === 0) return "☀️";
   if (code <= 3) return "☁️";
   return "🌤";
-};
+}
 
 const times = data.hourly.time;
 
@@ -60,7 +72,8 @@ for (let i = 0; i < times.length; i++) {
   const code =
     data.hourly.weathercode[i];
 
-  const icon = emoji(code, rain, snow);
+  const icon =
+    emoji(code, rain, snow);
 
   const start = new Date(time);
 
@@ -91,7 +104,10 @@ for (let i = 0; i < times.length; i++) {
   });
 
   // 雨通知
-  if (probability >= 70 || rain > 0) {
+  if (
+    probability >= 70 ||
+    rain > 0
+  ) {
     cal.createEvent({
       id: `rain-alert-${time}`,
 
@@ -120,13 +136,16 @@ for (let i = 0; i < times.length; i++) {
   }
 }
 
+// docs フォルダ作成
 fs.mkdirSync("docs", {
   recursive: true,
 });
 
+// ICS保存
 fs.writeFileSync(
   "docs/weather.ics",
-  cal.toString()
+  cal.toString(),
+  "utf8"
 );
 
 console.log("generated docs/weather.ics");
