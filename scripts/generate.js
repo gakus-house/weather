@@ -143,9 +143,7 @@ fs.mkdirSync("docs", {
 
 // ICS保存
 fs.writeFileSync(
-  "docs/weather.ics",
+  "weather.ics",
   cal.toString(),
   "utf8"
 );
-
-console.log("generated docs/weather.ics");
