@@ -1,8 +1,8 @@
-import axios from "axios";
+    import axios from "axios";
 import ical from "ical-generator";
 import fs from "fs";
 
-// 多地域対応
+  // 多地域対応
 const locations = [
   {
     id: "sendai",
@@ -95,7 +95,6 @@ const locations = [
     lon: 140.7223,
   },
 ];
-
 function emoji(code, rain, snow) {
   if (snow > 0) return "❄️";
   if (rain > 5) return "⛈";
@@ -105,7 +104,37 @@ function emoji(code, rain, snow) {
   return "🌤";
 }
 
+function heatLevel(temp, humidity) {
+  const wbgt =
+    temp * 0.7 +
+    (humidity / 100) * temp * 0.3;
+
+  if (wbgt >= 31) {
+    return {
+      level: "危険",
+      icon: "🚨"
+    };
+  }
+
+  if (wbgt >= 28) {
+    return {
+      level: "厳重警戒",
+      icon: "⚠️"
+    };
+  }
+
+  if (wbgt >= 25) {
+    return {
+      level: "警戒",
+      icon: "🥵"
+    };
+  }
+
+  return null;
+}
+
 for (const loc of locations) {
+
   const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${loc.lat}` +
@@ -113,6 +142,7 @@ for (const loc of locations) {
     `&hourly=` +
     [
       "temperature_2m",
+      "relative_humidity_2m",
       "precipitation_probability",
       "rain",
       "snowfall",
@@ -134,17 +164,22 @@ for (const loc of locations) {
       ["X-WR-CALNAME", `${loc.name} 天気`],
       ["X-WR-TIMEZONE", "Asia/Tokyo"],
       ["REFRESH-INTERVAL;VALUE=DURATION", "PT1H"],
-      ["X-PUBLISHED-TTL", "PT1H"],
-    ],
+      ["X-PUBLISHED-TTL", "PT1H"]
+    ]
   });
 
   const times = data.hourly.time;
 
   for (let i = 0; i < times.length; i++) {
-    const time = times[i];
+
+    const time =
+      times[i];
 
     const temp =
       data.hourly.temperature_2m[i];
+
+    const humidity =
+      data.hourly.relative_humidity_2m[i];
 
     const rain =
       data.hourly.rain[i];
@@ -161,12 +196,16 @@ for (const loc of locations) {
     const icon =
       emoji(code, rain, snow);
 
-    const start = new Date(time);
+    const start =
+      new Date(time);
 
-    const end = new Date(start);
-    end.setHours(end.getHours() + 1);
+    const end =
+      new Date(start);
 
-    // 通常イベント
+    end.setHours(
+      end.getHours() + 1
+    );
+
     cal.createEvent({
       id: `${loc.id}-${time}`,
 
@@ -179,23 +218,23 @@ for (const loc of locations) {
       description:
         `${loc.name}\n` +
         `気温: ${temp}°C\n` +
+        `湿度: ${humidity}%\n` +
         `降水確率: ${probability}%\n` +
-        `雨量: ${rain}mm\n` +
-        `積雪: ${snow}cm`,
+        `雨量: ${rain}mm`,
 
       location: loc.name,
 
       busystatus: "FREE",
-      transparency: "TRANSPARENT",
+      transparency: "TRANSPARENT"
     });
 
-    // 雨通知
     if (
       probability >= 70 ||
       rain > 0
     ) {
       cal.createEvent({
-        id: `rain-${loc.id}-${time}`,
+        id:
+          `rain-${loc.id}-${time}`,
 
         start,
         end,
@@ -212,27 +251,68 @@ for (const loc of locations) {
         alarms: [
           {
             type: "display",
-            trigger: -1800,
-          },
+            trigger: -1800
+          }
         ],
 
         busystatus: "FREE",
-        transparency: "TRANSPARENT",
+        transparency: "TRANSPARENT"
+      });
+    }
+
+    const heat =
+      heatLevel(
+        temp,
+        humidity
+      );
+
+    if (heat) {
+
+      cal.createEvent({
+        id:
+          `heat-${loc.id}-${time}`,
+
+        start,
+        end,
+
+        summary:
+          `${heat.icon} 熱中症${heat.level}`,
+
+        description:
+          `${loc.name}\n` +
+          `気温: ${temp}°C\n` +
+          `湿度: ${humidity}%\n` +
+          `熱中症リスク: ${heat.level}`,
+
+        location: loc.name,
+
+        alarms: [
+          {
+            type: "display",
+            trigger: -3600
+          }
+        ],
+
+        busystatus: "FREE",
+        transparency: "TRANSPARENT"
       });
     }
   }
 
-  // フォルダ作成
-  fs.mkdirSync(loc.id, {
-    recursive: true,
-  });
+  fs.mkdirSync(
+    loc.id,
+    {
+      recursive: true
+    }
+  );
 
-  // 保存
   fs.writeFileSync(
     `${loc.id}/weather.ics`,
     cal.toString(),
     "utf8"
   );
 
-  console.log(`generated ${loc.id}`);
+  console.log(
+    `generated ${loc.id}`
+  );
 }
